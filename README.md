@@ -1,0 +1,2 @@
+# Adaptive-Multi-Granularity-Indexing-for-Heterogeneous-Documents
+Adaptive Multi-Granularity Hierarchical Indexing for Heterogeneous Documents is a smart retrieval framework that analyzes document complexity and dynamically builds hierarchical indexes at different granularities. It reduces token usage, retrieval cost, and latency while maintaining accurate information retrieval from long and complex documents.
