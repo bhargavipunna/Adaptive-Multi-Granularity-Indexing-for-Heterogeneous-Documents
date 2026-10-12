@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AMHIE: Adaptive Multi-Granularity Hierarchical Indexing Engine</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              100: '#cffafe',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+            },
+            emerald: {
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+            },
+            dark: {
+              bg: '#080B11',
+              surface: '#0F1523',
+              card: '#141C2E',
+              border: '#1F2B44',
+              hover: '#263554'
+            }
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float': 'float 6s ease-in-out infinite',
+            'glow': 'glow 2s ease-in-out infinite alternate',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-6px)' },
+            },
+            glow: {
+              '0%': { boxShadow: '0 0 15px rgba(6, 182, 212, 0.2)' },
+              '100%': { boxShadow: '0 0 30px rgba(6, 182, 212, 0.6)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked for Markdown formatting -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+
+<body class="bg-dark-bg text-slate-100 min-h-screen font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+  <!-- Ambient Background Gradients -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/3 -right-40 w-[30rem] h-[30rem] bg-emerald-600/10 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-40 left-1/3 w-[32rem] h-[32rem] bg-indigo-600/10 rounded-full blur-3xl"></div>
+    <div class="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:24px_24px]"></div>
+  </div>
+
+  <div class="relative z-10 flex flex-col min-h-screen">
+    <!-- TOP NAVIGATION BAR -->
+    <header class="sticky top-0 z-40 backdrop-blur-xl bg-dark-surface/80 border-b border-dark-border px-6 py-3.5 transition-all">
+      <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white font-bold">
+            <i data-lucide="git-fork" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">AMHIE</span>
+              <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">v2.0 Modular</span>
+            </div>
+            <p class="text-xs text-slate-400 hidden sm:block">Adaptive Multi-Granularity Hierarchical Indexing Engine</p>
+          </div>
+        </div>
+
+        <!-- System Telemetry Status Pills -->
+        <div class="hidden md:flex items-center space-x-3">
+          <div class="flex items-center space-x-2 px-3 py-1 rounded-lg bg-dark-card border border-dark-border text-xs">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-slate-400">Tree Engine:</span>
+            <span class="font-mono text-emerald-400 font-medium">C++17 dylib</span>
+          </div>
+
+          <div class="flex items-center space-x-2 px-3 py-1 rounded-lg bg-dark-card border border-dark-border text-xs">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span class="text-slate-400">Vector Index:</span>
+            <span class="font-mono text-cyan-400 font-medium">Qdrant HNSW</span>
+          </div>
+
+          <div class="flex items-center space-x-2 px-3 py-1 rounded-lg bg-dark-card border border-dark-border text-xs">
+            <span class="text-slate-400">Embeddings:</span>
+            <span class="font-mono text-violet-400 font-medium">BGE-384d</span>
+          </div>
+        </div>
+
+        <!-- Header Actions -->
+        <div class="flex items-center space-x-2.5">
+          <button id="btn-load-sample" class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white text-xs font-semibold shadow-md shadow-cyan-600/25 transition-all active:scale-95">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>Load Benchmark Sample</span>
+          </button>
+
+          <a href="/docs" target="_blank" class="p-2 rounded-lg bg-dark-card border border-dark-border hover:bg-dark-hover text-slate-300 hover:text-white transition-all text-xs flex items-center" title="API Docs">
+            <i data-lucide="file-code" class="w-4 h-4"></i>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- NAVIGATION TABS (Framed Motion Style) -->
+    <div class="backdrop-blur-md bg-dark-bg/60 border-b border-dark-border/80 sticky top-[65px] z-30 px-6">
+      <div class="max-w-7xl mx-auto flex space-x-1 sm:space-x-2 overflow-x-auto no-scrollbar py-2">
+        <button data-tab="overview" class="tab-btn active flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all">
+          <i data-lucide="activity" class="w-4 h-4"></i>
+          <span>Command Center</span>
+        </button>
+
+        <button data-tab="tree" class="tab-btn flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all">
+          <i data-lucide="network" class="w-4 h-4"></i>
+          <span>C++ N-ary Tree Graph</span>
+        </button>
+
+        <button data-tab="storage" class="tab-btn flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all">
+          <i data-lucide="database" class="w-4 h-4"></i>
+          <span>Backend Storage Explorer</span>
+          <span class="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono">4 Tiers</span>
+        </button>
+
+        <button data-tab="rag" class="tab-btn flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all">
+          <i data-lucide="search" class="w-4 h-4"></i>
+          <span>Adaptive RAG & Traversal</span>
+        </button>
+
+        <button data-tab="ingest" class="tab-btn flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all">
+          <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+          <span>Ingestion & Threshold Tuner</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 space-y-8">
+
+      <!-- ================================================================= -->
+      <!-- TAB 1: EXECUTIVE COMMAND CENTER & OVERVIEW -->
+      <!-- ================================================================= -->
+      <section id="view-overview" class="tab-view active space-y-6">
+        <!-- Hero Banner with Motion Glow -->
+        <div class="relative overflow-hidden rounded-2xl border border-dark-border bg-gradient-to-br from-dark-card via-dark-surface to-dark-bg p-6 sm:p-8 shadow-2xl">
+          <div class="absolute -right-20 -bottom-20 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div class="space-y-3 max-w-3xl">
+              <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold">
+                <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                <span>Ingestion-Time Adaptive Indexing Architecture</span>
+              </div>
+              <h1 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
+                High-Performance Multimodal RAG with <span class="bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">Structural N-ary Trees</span>
+              </h1>
+              <p class="text-sm sm:text-base text-slate-300 leading-relaxed">
+                AMHIE calculates visual dominance and token compactness at ingestion time to dynamically branch pages into lightweight coarse nodes or dedicated child subtrees for multi-row tables and figures.
+              </p>
+            </div>
+
+            <!-- Active Document Card -->
+            <div id="active-doc-banner-card" class="rounded-xl bg-dark-bg/80 border border-dark-border p-5 backdrop-blur-md min-w-[280px] shadow-lg">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+                <span>Active Indexed Document</span>
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              </div>
+              <h3 id="hero-doc-title" class="text-base font-bold text-white truncate max-w-[240px]">AMHIE_Enterprise_Financial_Benchmark.pdf</h3>
+              <p id="hero-doc-subtitle" class="text-xs text-slate-400 mt-1 font-mono">ID: doc_loading | 4 Pages</p>
+              <div class="mt-4 pt-3 border-t border-dark-border flex items-center justify-between text-xs">
+                <span class="text-slate-400">Storage Economy:</span>
+                <span id="hero-storage-savings" class="font-bold font-mono text-emerald-400">66.7% vector reduction</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-Time Metric Telemetry KPI Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div class="kpi-card p-4 rounded-xl bg-dark-card/90 border border-dark-border backdrop-blur-md hover:border-cyan-500/40 transition-all">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">Tree Nodes</span>
+              <div class="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400"><i data-lucide="git-commit" class="w-4 h-4"></i></div>
+            </div>
+            <div id="kpi-total-nodes" class="text-2xl font-black font-mono text-white">0</div>
+            <div class="text-[11px] text-slate-400 mt-1 flex items-center space-x-1">
+              <i data-lucide="cpu" class="w-3 h-3 text-cyan-400"></i>
+              <span>C++17 in-memory graph</span>
+            </div>
+          </div>
+
+          <div class="kpi-card p-4 rounded-xl bg-dark-card/90 border border-dark-border backdrop-blur-md hover:border-emerald-500/40 transition-all">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">Indexed Vectors</span>
+              <div class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400"><i data-lucide="layers" class="w-4 h-4"></i></div>
+            </div>
+            <div id="kpi-total-vectors" class="text-2xl font-black font-mono text-emerald-400">0</div>
+            <div class="text-[11px] text-slate-400 mt-1 flex items-center space-x-1">
+              <i data-lucide="database" class="w-3 h-3 text-emerald-400"></i>
+              <span>Qdrant HNSW (384 dims)</span>
+            </div>
+          </div>
+
+          <div class="kpi-card p-4 rounded-xl bg-dark-card/90 border border-dark-border backdrop-blur-md hover:border-violet-500/40 transition-all">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">Coarse Pages</span>
+              <div class="p-1.5 rounded-lg bg-violet-500/10 text-violet-400"><i data-lucide="file-text" class="w-4 h-4"></i></div>
+            </div>
+            <div id="kpi-coarse-pages" class="text-2xl font-black font-mono text-violet-400">0</div>
+            <div class="text-[11px] text-slate-400 mt-1 flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+              <span>Low complexity (Zero child cost)</span>
+            </div>
+          </div>
+
+          <div class="kpi-card p-4 rounded-xl bg-dark-card/90 border border-dark-border backdrop-blur-md hover:border-amber-500/40 transition-all">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">Complex Subtrees</span>
+              <div class="p-1.5 rounded-lg bg-amber-500/10 text-amber-400"><i data-lucide="folder-tree" class="w-4 h-4"></i></div>
+            </div>
+            <div id="kpi-complex-pages" class="text-2xl font-black font-mono text-amber-400">0</div>
+            <div class="text-[11px] text-slate-400 mt-1 flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              <span>Tables & Figures extracted</span>
+            </div>
+          </div>
+
+          <div class="kpi-card p-4 rounded-xl bg-dark-card/90 border border-dark-border backdrop-blur-md hover:border-blue-500/40 transition-all col-span-2 sm:col-span-1">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+              <span class="text-xs font-medium uppercase tracking-wider">Vector Savings</span>
+              <div class="p-1.5 rounded-lg bg-blue-500/10 text-blue-400"><i data-lucide="percent" class="w-4 h-4"></i></div>
+            </div>
+            <div id="kpi-savings-pct" class="text-2xl font-black font-mono text-blue-400">66.7%</div>
+            <div class="text-[11px] text-slate-400 mt-1 flex items-center space-x-1">
+              <i data-lucide="shield-check" class="w-3 h-3 text-blue-400"></i>
+              <span>vs Uniform Flat Chunking</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- End-to-End Pipeline Architecture Flowchart -->
+        <div class="rounded-2xl border border-dark-border bg-dark-card/60 p-6 backdrop-blur-md space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <div class="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400"><i data-lucide="workflow" class="w-4 h-4"></i></div>
+              <h2 class="text-base font-bold text-white">Ingestion to Adaptive Retrieval Pipeline Flow</h2>
+            </div>
+            <span class="text-xs font-mono text-slate-400">7-Stage Modular Pipeline</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-7 gap-2.5 pt-2">
+            <!-- Stage 1 -->
+            <div class="pipeline-step-card p-3 rounded-xl bg-dark-surface/90 border border-dark-border text-center space-y-1.5">
+              <div class="text-[10px] font-bold text-cyan-400 font-mono">STAGE 1</div>
+              <div class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 mx-auto flex items-center justify-center"><i data-lucide="file-up" class="w-4 h-4"></i></div>
+              <div class="text-xs font-semibold text-white">PDF Ingestion</div>
+              <div class="text-[10px] text-slate-400 leading-tight">PyMuPDF / MinerU extraction</div>
+            </div>
+
+            <!-- Stage 2 -->
+            <div class="pipeline-step-card p-3 rounded-xl bg-dark-surface/90 border border-dark-border text-center space-y-1.5">
+              <div class="text-[10px] font-bold text-teal-400 font-mono">STAGE 2</div>
+              <div class="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-400 mx-auto flex items-center justify-center"><i data-lucide="scan" class="w-4 h-4"></i></div>
+              <div class="text-xs font-semibold text-white">Feature Extraction</div>
+              <div class="text-[10px] text-slate-400 leading-tight">VDS, Td, Layout dispersion</div>
+            </div>
+
+            <!-- Stage 3 -->
+            <div class="pipeline-step-card p-3 rounded-xl bg-dark-surface/90 border border-dark-border text-center space-y-1.5">
+              <div class="text-[10px] font-bold text-emerald-400 font-mono">STAGE 3</div>
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 mx-auto flex items-center justify-center"><i data-lucide="git-compare" class="w-4 h-4"></i></div>
+              <div class="text-xs font-semibold text-white">Adaptive Scoring</div>
+              <div class="text-[10px] text-slate-400 leading-tight">CS vs Tau (0.45) boundary</div>
+            </div>
+
+            <!-- Stage 4 -->
+            <div class="pipeline-step-card p-3 rounded-xl bg-dark-surface/90 border border-dark-border text-center space-y-1.5">
+              <div class="text-[10px] font-bold text-indigo-400 font-mono">STAGE 4</div>
+              <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 mx-auto flex items-center justify-center"><i data-lucide="network" class="w-4 h-4"></i></div>
+              <div class="text-xs font-semibold text-white">C++ Tree Engine</div>
+              <div class="text-[10px] text-slate-400 leading-tight">N-ary pointer hierarchy</div>
+            </div>
+
+            <!-- Stage 5 -->
+            <div class="pipeline-step-card p-3 rounded-xl bg-dark-surface/90 border border-dark-border text-center space-y-1.5">
+              <div class="text-[10px] font-bold text-violet-400 font-mono">STAGE 5</div>
+              <div class="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-400 mx-auto flex items-center justify-center"><i data-lucide="binary" class="w-4 h-4"></i></div>
+              <div class="text-xs font-semibold text-white">Qdrant HNSW</div>
+              <div class="text-[10px] text-slate-400 leading-tight">BGE-384d graph index</div>
+            </div>
+
+            <!-- Stage 6 -->
+            <div class="pipeline-step-card p-3 rounded-xl bg-dark-surface/90 border border-dark-border text-center space-y-1.5">
+              <div class="text-[10px] font-bold text-amber-400 font-mono">STAGE 6</div>
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 mx-auto flex items-center justify-center"><i data-lucide="route" class="w-4 h-4"></i></div>
+              <div class="text-xs font-semibold text-white">2-Stage Traversal</div>
+              <div class="text-[10px] text-slate-400 leading-tight">Coarse search -> child descent</div>
+            </div>
+
+            <!-- Stage 7 -->
+            <div class="pipeline-step-card p-3 rounded-xl bg-dark-surface/90 border border-dark-border text-center space-y-1.5">
+              <div class="text-[10px] font-bold text-rose-400 font-mono">STAGE 7</div>
+              <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 mx-auto flex items-center justify-center"><i data-lucide="bot" class="w-4 h-4"></i></div>
+              <div class="text-xs font-semibold text-white">LLM Synthesis</div>
+              <div class="text-[10px] text-slate-400 leading-tight">Qwen2.5 / Extractive citations</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Per-Page Complexity Breakdown Table -->
+        <div class="rounded-2xl border border-dark-border bg-dark-card/70 p-6 backdrop-blur-md space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-white">Per-Page Ingestion Complexity Telemetry</h2>
+              <p class="text-xs text-slate-400">Mathematical breakdown of continuous complexity metrics ($VDS, T_d, L_c$) and indexing decision</p>
+            </div>
+            <button id="btn-refresh-overview" class="p-2 rounded-lg bg-dark-surface hover:bg-dark-hover border border-dark-border text-slate-300 transition-all" title="Refresh Telemetry">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-dark-surface text-slate-400 uppercase text-[10px] font-mono tracking-wider border-b border-dark-border">
+                <tr>
+                  <th class="p-3">Page #</th>
+                  <th class="p-3">Classification Decision</th>
+                  <th class="p-3">Complexity Score (CS)</th>
+                  <th class="p-3">Visual Dominance (VDS)</th>
+                  <th class="p-3">Token Density (Td)</th>
+                  <th class="p-3">Tables</th>
+                  <th class="p-3">Images</th>
+                  <th class="p-3">Words</th>
+                </tr>
+              </thead>
+              <tbody id="table-page-breakdown" class="divide-y divide-dark-border font-mono">
+                <tr>
+                  <td colspan="8" class="p-6 text-center text-slate-500 font-sans">Loading document telemetry...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 2: C++17 STRUCTURAL N-ARY TREE GRAPH -->
+      <!-- ================================================================= -->
+      <section id="view-tree" class="tab-view hidden space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+              <span>Logical Document Hierarchy</span>
+              <span class="px-2 py-0.5 text-xs font-mono rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">C++17 Engine</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Interactive N-ary tree representation: Coarse Parent Nodes branch into child subtrees only for high-complexity pages.</p>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <button id="btn-filter-all" class="filter-node-btn active px-3 py-1 rounded-lg text-xs font-medium bg-cyan-500 text-white transition-all">All Nodes</button>
+            <button id="btn-filter-tables" class="filter-node-btn px-3 py-1 rounded-lg text-xs font-medium bg-dark-card border border-dark-border text-slate-300 hover:text-white transition-all">Tables Only</button>
+            <button id="btn-filter-complex" class="filter-node-btn px-3 py-1 rounded-lg text-xs font-medium bg-dark-card border border-dark-border text-slate-300 hover:text-white transition-all">Complex Pages</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Left: Tree Visualizer Container -->
+          <div class="lg:col-span-2 rounded-2xl border border-dark-border bg-dark-card/70 p-5 backdrop-blur-md min-h-[500px] flex flex-col">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-dark-border">
+              <div class="flex items-center space-x-3 text-xs">
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span><span class="text-slate-300">Coarse Page</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span><span class="text-slate-300">Complex Page</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span><span class="text-slate-300">Table</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-2.5 h-2.5 rounded-full bg-violet-400"></span><span class="text-slate-300">Image</span></span>
+              </div>
+              <span class="text-[11px] text-slate-400">Click any node to inspect</span>
+            </div>
+
+            <!-- Rendered Hierarchical Node Tree -->
+            <div id="tree-graph-canvas" class="flex-1 overflow-y-auto space-y-3 pr-2 max-h-[600px]">
+              <div class="p-8 text-center text-slate-500">Loading C++ N-ary Tree structure...</div>
+            </div>
+          </div>
+
+          <!-- Right: Selected Node Detail Inspector Drawer -->
+          <div class="rounded-2xl border border-dark-border bg-dark-card/90 p-5 backdrop-blur-md flex flex-col">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-dark-border">
+              <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                <i data-lucide="inspect" class="w-4 h-4 text-cyan-400"></i>
+                <span>Node Inspector</span>
+              </h3>
+              <span id="inspector-node-type-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">DOCUMENT</span>
+            </div>
+
+            <div id="node-inspector-content" class="space-y-4 text-xs">
+              <div class="p-4 rounded-xl bg-dark-surface border border-dark-border space-y-2">
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Node ID:</span>
+                  <span id="insp-node-id" class="font-mono text-cyan-400 font-bold">doc_root</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Page Number:</span>
+                  <span id="insp-node-page" class="font-mono text-white">0</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Parent ID:</span>
+                  <span id="insp-node-parent" class="font-mono text-slate-400">None (Root)</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Bounding Box:</span>
+                  <span id="insp-node-bbox" class="font-mono text-emerald-400 text-[11px]">[0, 0, 600, 800]</span>
+                </div>
+              </div>
+
+              <div>
+                <h4 class="font-semibold text-slate-300 mb-1.5">Node Content & Structural Markdown</h4>
+                <div id="insp-node-text" class="p-3 rounded-xl bg-dark-surface border border-dark-border text-slate-300 text-xs max-h-56 overflow-y-auto font-mono whitespace-pre-wrap">
+                  Select a node from the tree graph to view its extracted content, bounding box, and memory attributes.
+                </div>
+              </div>
+
+              <div>
+                <h4 class="font-semibold text-slate-300 mb-1.5">Node Metadata</h4>
+                <div id="insp-node-meta" class="p-3 rounded-xl bg-dark-surface border border-dark-border text-[11px] font-mono text-slate-400 max-h-36 overflow-y-auto">
+                  {}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 3: BACKEND STORAGE & DATA ARCHITECTURE EXPLORER -->
+      <!-- ================================================================= -->
+      <section id="view-storage" class="tab-view hidden space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+              <span>Backend Data Storage & System Architecture</span>
+              <span class="px-2 py-0.5 text-xs font-mono rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Modular 4-Tier</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Comprehensive introspection of how documents, vectors, pointers, and complexity metrics are stored.</p>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <span class="text-xs text-slate-400">Total Vectors Stored:</span>
+            <span id="storage-vector-badge" class="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold">0</span>
+          </div>
+        </div>
+
+        <!-- 4 Storage Tiers Interactive Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Tier 1 -->
+          <div class="storage-tier-card p-5 rounded-2xl bg-dark-card border border-dark-border hover:border-cyan-500/40 transition-all space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">TIER 1</span>
+              <i data-lucide="file-text" class="w-4 h-4 text-cyan-400"></i>
+            </div>
+            <h3 class="text-sm font-bold text-white">Multimodal Document & Parse Storage</h3>
+            <p class="text-xs text-slate-400">Preserves bounding box coordinates `[x0, y0, x1, y1]`, structured Markdown tables, and image crops.</p>
+            <div class="pt-2 border-t border-dark-border text-[11px] space-y-1 font-mono">
+              <div class="flex justify-between"><span class="text-slate-500">Engine:</span><span class="text-slate-300">PyMuPDF / MinerU</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Format:</span><span class="text-slate-300">Tables + Bboxes</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Integrity:</span><span class="text-emerald-400">100% Markdown</span></div>
+            </div>
+          </div>
+
+          <!-- Tier 2 -->
+          <div class="storage-tier-card p-5 rounded-2xl bg-dark-card border border-dark-border hover:border-emerald-500/40 transition-all space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">TIER 2</span>
+              <i data-lucide="cpu" class="w-4 h-4 text-emerald-400"></i>
+            </div>
+            <h3 class="text-sm font-bold text-white">C++17 Structural N-ary Tree Memory</h3>
+            <p class="text-xs text-slate-400">Zero-copy logical document layout in C++ shared library memory with pointer traversal.</p>
+            <div class="pt-2 border-t border-dark-border text-[11px] space-y-1 font-mono">
+              <div class="flex justify-between"><span class="text-slate-500">Engine:</span><span class="text-slate-300">libtree_engine.dylib</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Pointers:</span><span class="text-slate-300">shared_ptr&lt;TreeNode&gt;</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Traversal:</span><span class="text-emerald-400">&lt; 0.1ms Logarithmic</span></div>
+            </div>
+          </div>
+
+          <!-- Tier 3 -->
+          <div class="storage-tier-card p-5 rounded-2xl bg-dark-card border border-dark-border hover:border-violet-500/40 transition-all space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-violet-500/15 text-violet-400 border border-violet-500/30">TIER 3</span>
+              <i data-lucide="layers" class="w-4 h-4 text-violet-400"></i>
+            </div>
+            <h3 class="text-sm font-bold text-white">Qdrant Vector Database & HNSW Graph</h3>
+            <p class="text-xs text-slate-400">384-dimensional dense semantic vectors with multi-layer small world proximity graph.</p>
+            <div class="pt-2 border-t border-dark-border text-[11px] space-y-1 font-mono">
+              <div class="flex justify-between"><span class="text-slate-500">Metric:</span><span class="text-slate-300">Cosine Distance</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Graph:</span><span class="text-violet-400">M=16, ef=100</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Model:</span><span class="text-slate-300">BGE-small-en-v1.5</span></div>
+            </div>
+          </div>
+
+          <!-- Tier 4 -->
+          <div class="storage-tier-card p-5 rounded-2xl bg-dark-card border border-dark-border hover:border-amber-500/40 transition-all space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">TIER 4</span>
+              <i data-lucide="gauge" class="w-4 h-4 text-amber-400"></i>
+            </div>
+            <h3 class="text-sm font-bold text-white">Adaptive Complexity & Feature Store</h3>
+            <p class="text-xs text-slate-400">Continuous scoring formulations deciding between coarse summaries and fine child subtrees.</p>
+            <div class="pt-2 border-t border-dark-border text-[11px] space-y-1 font-mono">
+              <div class="flex justify-between"><span class="text-slate-500">Threshold:</span><span class="text-amber-400">Tau = 0.45</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Weights:</span><span class="text-slate-300">VDS (0.35), Td (0.10)</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Table Bonus:</span><span class="text-emerald-400">+0.15</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Vector DB Explorer Table -->
+        <div class="rounded-2xl border border-dark-border bg-dark-card/80 p-6 backdrop-blur-md space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="database" class="w-4 h-4 text-cyan-400"></i>
+                <span>Live Qdrant Vector Store Point Inspector</span>
+              </h3>
+              <p class="text-xs text-slate-400">Inspect actual 384-dimensional vector points, payloads, parent relationships, and metadata stored in Qdrant.</p>
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <input id="search-vectors-input" type="text" placeholder="Filter by node ID, type, content..." class="px-3 py-1.5 rounded-lg bg-dark-surface border border-dark-border text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-52 sm:w-64 font-sans" />
+            </div>
+          </div>
+
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-dark-surface sticky top-0 text-slate-400 uppercase text-[10px] font-mono tracking-wider border-b border-dark-border">
+                <tr>
+                  <th class="p-3">Vector Point ID</th>
+                  <th class="p-3">Node Type</th>
+                  <th class="p-3">Page #</th>
+                  <th class="p-3">Parent Node</th>
+                  <th class="p-3">Vector Preview (384d)</th>
+                  <th class="p-3">Payload Preview</th>
+                  <th class="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="table-vectors-body" class="divide-y divide-dark-border font-mono">
+                <tr>
+                  <td colspan="7" class="p-6 text-center text-slate-500 font-sans">Loading vector points...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- HNSW Graph Index Technical Architecture & B-Tree Contrast -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="rounded-2xl border border-dark-border bg-dark-card/70 p-5 backdrop-blur-md space-y-3">
+            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="cpu" class="w-4 h-4 text-emerald-400"></i>
+              <span>HNSW Graph Parameters & Guarantees</span>
+            </h3>
+            <div class="space-y-2 text-xs text-slate-300 leading-relaxed font-sans">
+              <p>The vector store configures a <strong>Hierarchical Navigable Small World (HNSW)</strong> graph index optimized for high-dimensional cosine similarity:</p>
+              <ul class="space-y-1.5 font-mono text-[11px] text-slate-300">
+                <li><span class="text-cyan-400 font-bold">• M = 16:</span> Maximum outgoing connections per node across graph layers.</li>
+                <li><span class="text-cyan-400 font-bold">• ef_construct = 100:</span> Dynamic candidate priority queue size during index construction.</li>
+                <li><span class="text-cyan-400 font-bold">• search_ef = 64:</span> Search-time exploration candidate size for logarithmic recall.</li>
+                <li><span class="text-cyan-400 font-bold">• Metric = Cosine:</span> Normalized inner product in \(\mathbb{R}^{384}\).</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-dark-border bg-dark-card/70 p-5 backdrop-blur-md space-y-3">
+            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="git-merge" class="w-4 h-4 text-cyan-400"></i>
+              <span>Why HNSW + N-ary Trees (vs B-Trees)</span>
+            </h3>
+            <div class="space-y-2 text-xs text-slate-300 leading-relaxed font-sans">
+              <p>Traditional databases use <strong>B-Trees</strong> for 1D scalar intervals (e.g. timestamps, integer keys). When scaled to 384 dimensions, B-trees collapse due to the <em>Curse of Dimensionality</em> and degrade to \(O(N)\) linear scans.</p>
+              <p>AMHIE solves this by pairing:</p>
+              <ul class="space-y-1 font-mono text-[11px] text-slate-300">
+                <li><span class="text-emerald-400 font-bold">1. C++ N-ary Tree:</span> Handles deterministic hierarchical layout and page-child containment.</li>
+                <li><span class="text-cyan-400 font-bold">2. Qdrant HNSW:</span> Handles high-dimensional fuzzy semantic similarity in \(O(\log N)\) time.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 4: ADAPTIVE RAG SEARCH & TRAVERSAL CONSOLE -->
+      <!-- ================================================================= -->
+      <section id="view-rag" class="tab-view hidden space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+            <span>Adaptive RAG Query & Traversal Console</span>
+            <span class="px-2 py-0.5 text-xs font-mono rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">Two-Stage HNSW</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Observe how AMHIE queries coarse page nodes first and dynamically branches into fine-grained table and visual elements.</p>
+        </div>
+
+        <!-- Query Input Console -->
+        <div class="rounded-2xl border border-dark-border bg-dark-card/80 p-6 backdrop-blur-md space-y-4">
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-300">Enter Document Query</label>
+            <div class="flex flex-col sm:flex-row gap-3">
+              <input id="rag-query-input" type="text" value="What were the Q4 2024 operating margins and revenue?" class="flex-1 px-4 py-3 rounded-xl bg-dark-surface border border-dark-border text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-sans shadow-inner" placeholder="Ask anything about the document..." />
+              <button id="btn-run-rag" class="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold text-sm shadow-lg shadow-cyan-600/30 transition-all flex items-center justify-center space-x-2 active:scale-95">
+                <i data-lucide="play" class="w-4 h-4"></i>
+                <span>Execute Adaptive RAG</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Query Preset Chips -->
+          <div class="space-y-2 pt-2 border-t border-dark-border">
+            <span class="text-xs text-slate-400 font-medium">Quick Benchmark Query Presets:</span>
+            <div id="sample-query-chips" class="flex flex-wrap gap-2">
+              <button class="query-chip text-left px-3 py-1.5 rounded-lg bg-dark-surface hover:bg-dark-hover border border-dark-border text-xs text-slate-300 hover:text-cyan-300 transition-all">
+                📊 What were the Q4 2024 operating margins and revenue?
+              </button>
+              <button class="query-chip text-left px-3 py-1.5 rounded-lg bg-dark-surface hover:bg-dark-hover border border-dark-border text-xs text-slate-300 hover:text-cyan-300 transition-all">
+                🔬 Precision@5 and table preservation score of AMHIE vs flat RAG?
+              </button>
+              <button class="query-chip text-left px-3 py-1.5 rounded-lg bg-dark-surface hover:bg-dark-hover border border-dark-border text-xs text-slate-300 hover:text-cyan-300 transition-all">
+                📄 Why does uniform flat 512-token chunking fail on multimodal docs?
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RAG Results Container -->
+        <div id="rag-results-container" class="space-y-6">
+          <!-- Synthesized Answer Card -->
+          <div class="rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-dark-card to-dark-surface p-6 backdrop-blur-md shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-500"></div>
+            
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center space-x-2">
+                <div class="p-1.5 rounded-lg bg-cyan-500/15 text-cyan-400"><i data-lucide="sparkles" class="w-4 h-4"></i></div>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">Synthesized Answer</h3>
+              </div>
+              <div class="flex items-center space-x-2 text-xs font-mono">
+                <span id="rag-latency-badge" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Latency: 14.2 ms</span>
+                <span id="rag-generator-badge" class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">AMHIE Extractive Reasoner</span>
+              </div>
+            </div>
+
+            <div id="rag-answer-content" class="prose prose-invert max-w-none text-slate-200 text-sm leading-relaxed">
+              Click <strong>"Execute Adaptive RAG"</strong> or choose a query preset above to run the search and observe the adaptive retrieval paths.
+            </div>
+          </div>
+
+          <!-- Adaptive Retrieval Traversal Paths -->
+          <div class="rounded-2xl border border-dark-border bg-dark-card/70 p-6 backdrop-blur-md space-y-4">
+            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="compass" class="w-4 h-4 text-amber-400"></i>
+              <span>Adaptive HNSW Traversal Path Trace</span>
+            </h3>
+            <div id="rag-traversal-paths" class="space-y-2 font-mono text-xs">
+              <div class="p-3 rounded-xl bg-dark-surface border border-dark-border text-slate-400">
+                Traversal paths will be recorded during query execution.
+              </div>
+            </div>
+          </div>
+
+          <!-- Retrieved Context Elements -->
+          <div class="rounded-2xl border border-dark-border bg-dark-card/70 p-6 backdrop-blur-md space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                <i data-lucide="layers" class="w-4 h-4 text-emerald-400"></i>
+                <span>Retrieved Context Elements</span>
+              </h3>
+              <span id="rag-contexts-count" class="text-xs text-slate-400 font-mono">0 contexts retrieved</span>
+            </div>
+
+            <div id="rag-contexts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Context elements inserted dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 5: INGESTION PLAYGROUND & THRESHOLD TUNER -->
+      <!-- ================================================================= -->
+      <section id="view-ingest" class="tab-view hidden space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+            <span>Ingestion Playground & Adaptive Threshold Tuner</span>
+            <span class="px-2 py-0.5 text-xs font-mono rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Stage 3 Scorer</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Tune the continuous complexity boundary (\(\tau\)) and upload custom heterogeneous PDF documents.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Left: Upload & Slider Card -->
+          <div class="lg:col-span-1 rounded-2xl border border-dark-border bg-dark-card/80 p-6 backdrop-blur-md space-y-6">
+            <!-- Threshold Slider -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Decision Threshold (\(\tau\))</label>
+                <span id="slider-tau-val" class="font-mono text-cyan-400 font-bold text-sm">0.45</span>
+              </div>
+              <input id="slider-tau" type="range" min="0.10" max="0.90" step="0.05" value="0.45" class="w-full accent-cyan-500 bg-dark-surface rounded-lg cursor-pointer" />
+              <p class="text-[11px] text-slate-400 leading-tight">
+                Pages with \(CS < \tau\) remain lightweight coarse nodes; pages with \(CS \ge \tau\) branch into fine-grained subtrees.
+              </p>
+            </div>
+
+            <!-- Upload Box -->
+            <div class="space-y-2 pt-4 border-t border-dark-border">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-300">Upload PDF Document</label>
+              <div id="dropzone" class="border-2 border-dashed border-dark-border hover:border-cyan-500/50 rounded-xl p-6 text-center cursor-pointer transition-all bg-dark-surface/50 hover:bg-dark-surface">
+                <input id="file-input" type="file" accept=".pdf,.txt,.md" class="hidden" />
+                <div class="w-10 h-10 rounded-full bg-cyan-500/10 text-cyan-400 mx-auto flex items-center justify-center mb-2">
+                  <i data-lucide="upload" class="w-5 h-5"></i>
+                </div>
+                <div class="text-xs font-medium text-white">Click or drag & drop PDF</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">PDF, Markdown, or TXT</div>
+              </div>
+            </div>
+
+            <!-- Re-index button -->
+            <button id="btn-reindex-sample" class="w-full py-2.5 rounded-xl bg-dark-surface hover:bg-dark-hover border border-dark-border text-white text-xs font-semibold flex items-center justify-center space-x-2 transition-all">
+              <i data-lucide="refresh-ccw" class="w-4 h-4 text-cyan-400"></i>
+              <span>Re-index with current \(\tau\)</span>
+            </button>
+          </div>
+
+          <!-- Right: Mathematical Formulation & Threshold Dynamics -->
+          <div class="lg:col-span-2 rounded-2xl border border-dark-border bg-dark-card/80 p-6 backdrop-blur-md space-y-5">
+            <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="binary" class="w-4 h-4 text-cyan-400"></i>
+              <span>Ingestion Mathematical Formulation</span>
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+              <div class="p-3.5 rounded-xl bg-dark-surface border border-dark-border space-y-1">
+                <span class="text-cyan-400 font-bold">Visual Dominance Score (VDS)</span>
+                <p class="text-[11px] text-slate-400 font-sans">Ratio of table & figure area to total page dimensions:</p>
+                <div class="text-[11px] text-slate-300">VDS = (Area_Tables + Area_Images) / Page_Area</div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-dark-surface border border-dark-border space-y-1">
+                <span class="text-emerald-400 font-bold">Scaled Token Density (Td)</span>
+                <p class="text-[11px] text-slate-400 font-sans">Compactness of linguistic tokens per unit surface:</p>
+                <div class="text-[11px] text-slate-300">Td = (Words * 1.3 / Page_Area) * 10^4</div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-dark-surface border border-dark-border space-y-1">
+                <span class="text-amber-400 font-bold">Layout Complexity (Lc)</span>
+                <p class="text-[11px] text-slate-400 font-sans">Multi-column & element boundary penalty:</p>
+                <div class="text-[11px] text-slate-300">Lc = (N_text*0.4) + (N_tab*3.5) + (N_img*1.5)</div>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-dark-surface border border-dark-border space-y-1">
+                <span class="text-violet-400 font-bold">Continuous Complexity Score (CS)</span>
+                <p class="text-[11px] text-slate-400 font-sans">Weighted multi-objective decision:</p>
+                <div class="text-[11px] text-slate-300">CS = 0.35*VDS + 0.35*Elems + 0.20*Lc + 0.10*Td</div>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/20 text-xs text-slate-300 space-y-1.5 font-sans">
+              <span class="font-bold text-cyan-300 flex items-center space-x-1">
+                <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                <span>Decision Criterion:</span>
+              </span>
+              <p>• If \(CS < \tau\) (\(0.45\)): Page is retained as a unified <strong>Coarse Parent Node</strong>. No micro-chunks are stored in Qdrant.</p>
+              <p>• If \(CS \ge \tau\) (\(0.45\)): Page is decomposed into an <strong>N-ary Subtree</strong> containing dedicated child nodes for structured Markdown tables and images.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-dark-border py-6 px-6 text-center text-xs text-slate-500 mt-auto">
+      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>AMHIE Engine: C++17 Structural Tree & Qdrant HNSW Multi-Tier Vector Store</span>
+        </div>
+        <div class="font-mono text-[11px] text-slate-400">
+          FastAPI + Streamlit + C-ABI Architecture
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- MODAL: VECTOR POINT DETAIL INSPECTOR -->
+  <div id="vector-detail-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-dark-card border border-dark-border rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl overflow-hidden">
+      <div class="flex items-center justify-between pb-3 border-b border-dark-border">
+        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+          <i data-lucide="binary" class="w-4 h-4 text-cyan-400"></i>
+          <span id="modal-point-title">Vector Point Inspection</span>
+        </h3>
+        <button id="btn-close-modal" class="p-1 rounded-lg hover:bg-dark-hover text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs max-h-[70vh] overflow-y-auto pr-1">
+        <div>
+          <label class="text-[11px] text-slate-400 uppercase font-mono">Qdrant Vector Payload JSON</label>
+          <pre id="modal-payload-json" class="p-3 rounded-xl bg-dark-surface border border-dark-border font-mono text-[11px] text-emerald-400 overflow-x-auto whitespace-pre-wrap"></pre>
+        </div>
+
+        <div>
+          <label class="text-[11px] text-slate-400 uppercase font-mono">Embedding Vector Sample (384-Dimensions)</label>
+          <pre id="modal-vector-sample" class="p-3 rounded-xl bg-dark-surface border border-dark-border font-mono text-[11px] text-cyan-300 overflow-x-auto"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 space-y-2 pointer-events-none"></div>
+
+  <!-- Application Logic -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

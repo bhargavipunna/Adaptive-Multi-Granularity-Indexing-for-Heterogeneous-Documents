@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C++ compiled binaries
+*.so
+*.dylib
+*.dll
+*.o
+*.a
+**/csrc/*.dylib
+**/csrc/*.so
+**/csrc/*.o
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Logs and databases
+*.log
+**/fastapi.log
+*.sqlite3
+*.db
+
+# Streamlit runtime & credentials
+.streamlit/credentials.toml
+**/.streamlit/credentials.toml
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Temporary files
+temp_upload.*
+*.tmp
